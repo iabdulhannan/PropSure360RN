@@ -111,6 +111,9 @@ function Home(props) {
       title: title,
       scenes: [...scenes],
     });
+
+    if(scenes.length)
+      console.log("New Scenes: ", Object.keys(scenes[0]));
     // eslint-disable-next-line
   }, [scenes]);
 
@@ -156,10 +159,11 @@ function Home(props) {
     if (!result.didCancel) {
       let newScenes = [];
       for (const item of result.assets) {
-        let resultant = null;
+        let resultant = {};
 
         if (item.width > 4096 || getImageSize(item.base64) > MAX_IMAGE_SIZE_IN_KBS) {
-          resultant = await compressImage(item.uri, true, true);
+          resultant.base64 = await compressImage(item.uri, true, true);
+          resultant.uri = await compressImage(item.uri, true, false);
           while (getImageSize(resultant) > MAX_IMAGE_SIZE_IN_KBS) {
             resultant = await compressImage(item.uri, true, true);
             console.log("Compressing because of size");
@@ -185,11 +189,14 @@ function Home(props) {
             });*/
         }
 
+        console.log('resultant.uri: ', resultant.uri);
+        console.log('item.uri: ', item.uri);
+
         var newScene = {
           sceneName: "Name of Scene",
-          scenePanoURI: item.uri,
+          scenePanoURI: resultant.uri ?? item.uri,
           // scenePanoImg: item.base64 ?? item.uri,
-          scenePanoImg: resultant ?? item.base64,
+          scenePanoImg: resultant.base64 ?? item.base64,
           hotSpotsArr: [],
         };
         newScenes.push(newScene);

@@ -1,5 +1,5 @@
 /* eslint-disable */
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
   Dimensions,
@@ -10,30 +10,31 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
-import WebView from 'react-native-webview';
-import {useWebViewMessage} from 'react-native-react-bridge';
-import Viewer from './Viewer';
+} from "react-native";
+import WebView from "react-native-webview";
+import { useWebViewMessage } from "react-native-react-bridge";
+import Viewer from "./Viewer";
 import BottomSheet, {
   BottomSheetFlatList,
   BottomSheetScrollView,
-} from '@gorhom/bottom-sheet';
-import {useDispatch} from 'react-redux';
-import Feather from 'react-native-vector-icons/Feather';
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+} from "@gorhom/bottom-sheet";
+import { useDispatch } from "react-redux";
+import Feather from "react-native-vector-icons/Feather";
+import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 import { addProperty } from "../../slices/PropertySlice";
+import axios from "axios";
 
-const PannellumViewer = ({image, navigation, route, showOptions = false}) => {
+const PannellumViewer = ({ image, navigation, route, showOptions = false }) => {
   const [property, setProperty] = useState(null);
   const [inEditor, setInEditor] = useState(showOptions);
   const [selectImage, setSelectImage] = useState(false);
   const [writeInfo, setWriteInfo] = useState(false);
   const [scenes, setScenes] = useState([]);
   const [enableSaving, setEnableSaving] = useState(false);
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState("");
 
   const sheetRef = useRef(null);
-  const snapPoints = useMemo(() => ['20%', '5%', '50%', '90%'], []);
+  const snapPoints = useMemo(() => ["20%", "5%", "50%", "90%"], []);
   const dispatch = useDispatch();
 
   useEffect(() => {
@@ -56,13 +57,13 @@ const PannellumViewer = ({image, navigation, route, showOptions = false}) => {
   }, []);
 
   const renderItem = useCallback(
-    ({item}) => (
+    ({ item }) => (
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={() => {
-          console.log('Index: ', item.index);
+          console.log("Index: ", item.index);
           emit({
-            type: 'sceneSelected',
+            type: "sceneSelected",
             data: item.index,
           });
           setSelectImage(false);
@@ -70,8 +71,8 @@ const PannellumViewer = ({image, navigation, route, showOptions = false}) => {
         style={styles.sceneListItem}>
         <View
           style={{
-            flexDirection: 'row',
-            alignItems: 'center',
+            flexDirection: "row",
+            alignItems: "center",
             // marginVertical: 5
           }}>
           <Image
@@ -80,13 +81,13 @@ const PannellumViewer = ({image, navigation, route, showOptions = false}) => {
               height: 40,
               borderRadius: 15,
             }}
-            source={{uri: `data:image/png;base64,${item.scenePanoImg}`}}
+            source={{ uri: `data:image/png;base64,${item.scenePanoImg}` }}
           />
           <Text
             style={{
               fontSize: 18,
               marginHorizontal: 10,
-              color: '#000'
+              color: "#000",
             }}>
             {item.sceneName}
           </Text>
@@ -113,85 +114,127 @@ const PannellumViewer = ({image, navigation, route, showOptions = false}) => {
   // useWebViewMessage hook create props for WebView and handle communication
   // The argument is callback to receive message from React
 
-  const {ref, onMessage, emit} = useWebViewMessage(message => {
+  const { ref, onMessage, emit } = useWebViewMessage(message => {
     // emit sends message to React
     //   type: event name
     //   data: some data which will be serialized by JSON.stringify
 
-    if (message.type === 'hello' && message.data === 123) {
+    if (message.type === "hello" && message.data === 123) {
       emit({
-        type: 'success',
-        data: 'succeeded!',
+        type: "success",
+        data: "succeeded!",
       });
     }
 
-    if (message.type === 'ready' && message.data === 'ready') {
+    if (message.type === "ready" && message.data === "ready") {
       emit({
-        type: 'openImage',
+        type: "openImage",
         data: property,
       });
     }
 
-    if (message.type === 'loggingData') {
+    if (message.type === "loggingData") {
       console.log(
-        '**************************Logging Data**************************',
+        "**************************Logging Data**************************",
       );
-      console.log('---> ', message.data);
+      console.log("---> ", message.data);
     }
 
-    if (message.type === 'selectImageForCustomHotspot') {
+    if (message.type === "selectImageForCustomHotspot") {
       setSelectImage(true);
       setEnableSaving(true);
     }
 
-    if (message.type === 'saveProperty') {
+    if (message.type === "saveProperty") {
       saveProperty(message.data);
     }
 
-    if (message.type === 'writeTextForInfoHotspot') {
+    if (message.type === "writeTextForInfoHotspot") {
       setWriteInfo(true);
     }
   });
 
   function placeHotSpots(type) {
-    if (type === 'custom') {
+    if (type === "custom") {
       emit({
-        type: 'selectImagesForPlacingHotspots',
+        type: "selectImagesForPlacingHotspots",
         data: null,
       });
     } else {
       emit({
-        type: 'enterTextForPlacingHotspots',
+        type: "enterTextForPlacingHotspots",
         data: null,
       });
     }
   }
 
 
-  function sendPropertyToServer(property) {
-
+  async function sendPropertyToServer(property) {
+    const response = await axios.post("http://192.168.18.138:8082/addproperty", property);
+    console.log("Response: ", response);
   }
 
+  const uploadImage = async file => {
+    try {
+      console.log("Upload Image", file);
+      const formData = new FormData();
+      let uriParts = file.split(".");
+      let fileType = uriParts[uriParts.length - 1];
+
+
+      formData.append("photo", {
+        uri: file,
+        name: `photo.${fileType}`,
+        type: `image/${fileType}`,
+      });
+      // console.log('formData.photo:', formData._parts);
+      // formData.append("filename", file);
+      // formData.append("destination", "images");
+      // formData.append("create_thumbnail", true);
+      const config = {
+        headers: {
+          Accept: "application/json",
+          "content-type": "multipart/form-data",
+        },
+      };
+
+      const result = await axios.post("http://192.168.18.138:8082/addproperty", formData, config);
+      console.log("Result: ", result);
+    } catch (error) {
+
+      console.error("Error whileUplaoding Image: ", error);
+    }
+  };
 
   function saveProperty(property) {
-    console.log('Property To be Saved');
-    console.log('Scenes: ', property.scenes.length);
-    dispatch(addProperty(property));
+
+    //Removing Base64 of Images
+    console.log("Property Before: ", Object.keys(property.scenes[0]));
+    for (const scene of property.scenes) {
+      scene.scenePanoImg = scene.scenePanoURI;
+      delete scene.scenePanoURI;
+    }
+    console.log("Property After: ", Object.keys(property.scenes[0]));
+    console.log("Property To be Saved");
+    console.log("Property: ", property);
+    uploadImage(property.scenes[0].scenePanoImg);
+    // sendPropertyToServer(property)
+    // dispatch(addProperty(property));
     // dispatch(addProperty({title: 'hello'}))
     setEnableSaving(false);
-    navigation.navigate('Home');
+    navigation.navigate("Home");
   }
 
   function getLatestProperty() {
     emit({
-      type: 'getLatestProperty',
+      type: "getLatestProperty",
       data: null,
     });
   }
 
   function placeInfoHotspot() {
     emit({
-      type: 'placeInfoHotspot',
+      type: "placeInfoHotspot",
       data: title,
     });
   }
@@ -204,20 +247,20 @@ const PannellumViewer = ({image, navigation, route, showOptions = false}) => {
             style={{
               zIndex: 10,
               borderRadius: 50,
-              position: 'absolute',
+              position: "absolute",
               top: 20,
               right: 10,
               padding: 1,
-              backgroundColor: '#fff',
+              backgroundColor: "#fff",
               // borderColor: '#000',
               // borderWidth: 1,
               width: 50,
               height: 50,
-              alignItems: 'center',
-              justifyContent: 'center',
+              alignItems: "center",
+              justifyContent: "center",
             }}
             onPress={() => {
-              placeHotSpots('custom');
+              placeHotSpots("custom");
             }}>
             {/*<Text style={{fontSize: 20}}>PH</Text>*/}
             <Feather name="crosshair" size={40} color="black" />
@@ -251,18 +294,18 @@ const PannellumViewer = ({image, navigation, route, showOptions = false}) => {
               style={{
                 zIndex: 10,
                 borderRadius: 50,
-                position: 'absolute',
+                position: "absolute",
                 // top: 140,
                 top: 80,
                 right: 10,
                 padding: 1,
-                backgroundColor: '#fff',
+                backgroundColor: "#fff",
                 // borderColor: '#000',
                 // borderWidth: 1,
                 width: 50,
                 height: 50,
-                justifyContent: 'center',
-                alignItems: 'center',
+                justifyContent: "center",
+                alignItems: "center",
               }}
               onPress={() => {
                 getLatestProperty();
@@ -278,15 +321,15 @@ const PannellumViewer = ({image, navigation, route, showOptions = false}) => {
         style={{
           // borderWidth: 2,
           // borderColor: 'blue',
-          height: Dimensions.get('window').height,
-          width: Dimensions.get('window').width,
-          position: 'absolute',
+          height: Dimensions.get("window").height,
+          width: Dimensions.get("window").width,
+          position: "absolute",
         }}>
         <WebView
           // ref, source and onMessage must be passed to react-native-webview
           ref={ref}
           // Pass the source code of React app
-          source={{html: Viewer}}
+          source={{ html: Viewer }}
           onMessage={onMessage}
         />
       </View>
@@ -301,15 +344,15 @@ const PannellumViewer = ({image, navigation, route, showOptions = false}) => {
           ref={sheetRef}
           snapPoints={snapPoints}
           backgroundStyle={{
-            backgroundColor: '#fff',
+            backgroundColor: "#fff",
           }}
           // onChange={handleSheetChange}
         >
           <FlatList
             ListFooterComponent={() => {
               return (
-                <View style={{marginVertical: 10}}>
-                  <Text style={{fontSize: 15, textAlign: 'center'}}>
+                <View style={{ marginVertical: 10 }}>
+                  <Text style={{ fontSize: 15, textAlign: "center" }}>
                     No More Scenes
                   </Text>
                 </View>
@@ -336,7 +379,7 @@ const PannellumViewer = ({image, navigation, route, showOptions = false}) => {
           ref={sheetRef}
           snapPoints={snapPoints}
           backgroundStyle={{
-            backgroundColor: '#fff',
+            backgroundColor: "#fff",
           }}
           // onChange={handleSheetChange}
         >
@@ -351,14 +394,14 @@ const PannellumViewer = ({image, navigation, route, showOptions = false}) => {
                 // borderWidth: 1,
                 borderRadius: 10,
               }}
-              placeholder={'Information'}
+              placeholder={"Information"}
               value={title}
               onChangeText={setTitle}
             />
 
             <View
               style={{
-                alignItems: 'center',
+                alignItems: "center",
               }}>
               <TouchableOpacity
                 style={{
@@ -366,10 +409,10 @@ const PannellumViewer = ({image, navigation, route, showOptions = false}) => {
                   paddingHorizontal: 15,
                   marginVertical: 5,
                   marginHorizontal: 5,
-                  borderColor: '#000',
+                  borderColor: "#000",
                   borderWidth: 1,
                   borderRadius: 10,
-                  backgroundColor: 'lightblue',
+                  backgroundColor: "lightblue",
                 }}
                 onPress={() => {
                   setWriteInfo(false);
@@ -396,9 +439,9 @@ const styles = StyleSheet.create({
     // borderWidth: 10
   },
   sceneListItem: {
-    borderColor: 'lightgrey',
+    borderColor: "lightgrey",
     borderWidth: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#fff",
     borderRadius: 15,
     elevation: 5,
     marginVertical: 5,

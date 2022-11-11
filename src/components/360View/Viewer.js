@@ -70,6 +70,7 @@ function Viewer() {
 
     const updatedScene = {
       sceneName: property.scenes[sceneIndex.current].sceneName,
+      scenePanoURI: property.scenes[sceneIndex.current].scenePanoURI,
       scenePanoImg: property.scenes[sceneIndex.current].scenePanoImg,
       hotSpotsArr: [
         ...property.scenes[sceneIndex.current].hotSpotsArr,
@@ -100,6 +101,7 @@ function Viewer() {
 
     const updatedScene = {
       sceneName: property.scenes[sceneIndex.current].sceneName,
+      scenePanoURI: property.scenes[sceneIndex.current].scenePanoURI,
       scenePanoImg: property.scenes[sceneIndex.current].scenePanoImg,
       hotSpotsArr: [
         ...property.scenes[sceneIndex.current].hotSpotsArr,
