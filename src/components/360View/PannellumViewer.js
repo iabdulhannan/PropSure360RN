@@ -168,59 +168,77 @@ const PannellumViewer = ({ image, navigation, route, showOptions = false }) => {
     }
   }
 
+  const randomKeyGenerator = () => {
+    let res = "";
+    for (let i = 0; i < 5; i++) {
+      const random = Math.floor(Math.random() * 27);
+      res += String.fromCharCode(97 + random);
+    }
+    ;
+    return res;
+  };
 
-  async function sendPropertyToServer(property) {
-    const response = await axios.post("http://192.168.18.138:8082/addproperty", property);
-    console.log("Response: ", response);
-  }
+  const uploadProperty = async (pictures, property) => {
 
-  const uploadImage = async file => {
+    const key = randomKeyGenerator();
+
     try {
-      console.log("Upload Image", file);
+
       const formData = new FormData();
-      let uriParts = file.split(".");
-      let fileType = uriParts[uriParts.length - 1];
 
-
-      formData.append("photo", {
-        uri: file,
-        name: `photo.${fileType}`,
-        type: `image/${fileType}`,
+      pictures.forEach((picture, index) => {
+        let uriParts = picture.uri.split(".");
+        let fileType = uriParts[uriParts.length - 1];
+        formData.append("photo",
+          {
+            uri: picture.uri,
+            name: `${key}-${picture.name}.${fileType}`,
+            type: `image/${fileType}`,
+          },
+        );
       });
-      // console.log('formData.photo:', formData._parts);
-      // formData.append("filename", file);
-      // formData.append("destination", "images");
-      // formData.append("create_thumbnail", true);
+
+      formData.append("property", JSON.stringify(property));
+      formData.append("key", JSON.stringify(key));
+
       const config = {
         headers: {
-          Accept: "application/json",
+          Accept: "multipart/form-data",
           "content-type": "multipart/form-data",
         },
       };
-
-      const result = await axios.post("http://192.168.18.138:8082/addproperty", formData, config);
+      // const result = await axios.post("http://192.168.18.138:8082/addproperty", formData, config);
+      const result = await axios.post("http://192.168.18.17:8082/addproperty", formData, config);
       console.log("Result: ", result);
+      return result.status
     } catch (error) {
 
-      console.error("Error whileUplaoding Image: ", error);
+      console.error("Error while Uploading Image: ", error);
     }
   };
 
-  function saveProperty(property) {
-
-    //Removing Base64 of Images
-    console.log("Property Before: ", Object.keys(property.scenes[0]));
-    for (const scene of property.scenes) {
-      scene.scenePanoImg = scene.scenePanoURI;
-      delete scene.scenePanoURI;
-    }
-    console.log("Property After: ", Object.keys(property.scenes[0]));
-    console.log("Property To be Saved");
-    console.log("Property: ", property);
-    uploadImage(property.scenes[0].scenePanoImg);
-    // sendPropertyToServer(property)
+  async function saveProperty(property) {
     // dispatch(addProperty(property));
-    // dispatch(addProperty({title: 'hello'}))
+
+    const pictures = [];
+    //Removing Base64 of Images & also pushing images into separate array
+    console.log("Property Before: ", Object.keys(property.scenes[0]));
+
+    property.scenes.forEach((scene, index) => {
+      //Pushing picture into array
+      const newImage = {
+        uri: scene.scenePanoURI,
+        name: index,
+      };
+      pictures.push(newImage);
+      //Placing index instead of image for matching at serverside
+      scene.scenePanoImg = index;
+      // scene.scenePanoImg = scene.scenePanoURI;
+      delete scene.scenePanoURI;
+    });
+
+    const response = await uploadProperty(pictures, property);
+    console.log("Saved Successfully");
     setEnableSaving(false);
     navigation.navigate("Home");
   }

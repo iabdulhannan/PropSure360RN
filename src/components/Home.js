@@ -27,6 +27,8 @@ import axios from "axios";
 import { Buffer } from "@craftzdog/react-native-buffer";
 
 function Home(props) {
+
+  const BASE_URL = "http://192.168.18.17:8082";
   const [title, setTitle] = useState("Floor Title");
   const [scenes, setScenes] = useState([]);
   const [newProperty, setNewProperty] = useState(null);
@@ -42,8 +44,8 @@ function Home(props) {
 
   const getProperties = async () => {
     const response = await axios
-      .get("http://192.168.18.138:8082/properties");
-    // .get("http://192.168.18.17:8082/properties")
+      // .get("http://192.168.18.138:8082/properties");
+      .get("http://192.168.18.17:8082/properties");
     return response;
   };
 
@@ -78,12 +80,8 @@ function Home(props) {
     return resultant;
   };
 
-  useEffect(() => {
-    //   setDeviceResolution({
-    //     height: PixelRatio.getPixelSizeForLayoutSize(window.height),
-    //     width: PixelRatio.getPixelSizeForLayoutSize(window.width),
-    //   });
 
+  function updateProperties() {
     getProperties().then(r => {
       console.log("Response: ", r);
       // console.log('Scene in response: ', r.data[0].scenes);
@@ -94,7 +92,7 @@ function Home(props) {
       for (const property of propertiesRcvd) {
         for (const scene of property.scenes) {
           if (scene.scenePanoImg) {
-            getImage(scene.scenePanoImg).then(res => {
+            getImage(`${BASE_URL}\\${scene.scenePanoImg}`).then(res => {
               scene.scenePanoImg = res;
               return res;
             });
@@ -103,6 +101,11 @@ function Home(props) {
       }
       setProperties(propertiesRcvd);
     });
+  }
+
+  useEffect(() => {
+
+    updateProperties();
     // eslint-disable-next-line
   }, []);
 
@@ -112,7 +115,7 @@ function Home(props) {
       scenes: [...scenes],
     });
 
-    if(scenes.length)
+    if (scenes.length)
       console.log("New Scenes: ", Object.keys(scenes[0]));
     // eslint-disable-next-line
   }, [scenes]);
@@ -189,8 +192,8 @@ function Home(props) {
             });*/
         }
 
-        console.log('resultant.uri: ', resultant.uri);
-        console.log('item.uri: ', item.uri);
+        console.log("resultant.uri: ", resultant.uri);
+        console.log("item.uri: ", item.uri);
 
         var newScene = {
           sceneName: "Name of Scene",
@@ -239,6 +242,7 @@ function Home(props) {
         renderItem={({ item }) => (
           <ListItem item={item} navigation={props.navigation} />
         )}
+
         ListEmptyComponent={() => {
           return (
             <View
@@ -311,6 +315,8 @@ function Home(props) {
             return null;
           }
         }}
+        onRefresh={() => updateProperties()}
+        refreshing={false}
       />
 
       <TouchableOpacity
