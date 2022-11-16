@@ -1,18 +1,15 @@
 import React, { useEffect, useState } from "react";
 import {
-  Button,
   Dimensions,
   FlatList,
-  PixelRatio,
   StyleSheet,
   Image,
   Text,
   TouchableOpacity,
-  useWindowDimensions,
   View,
+  ActivityIndicator,
 } from "react-native";
 import ListItem from "./ListItem";
-import { useFocusEffect } from "@react-navigation/native";
 import { windowWidth } from "../Utils/Constants";
 import { useDispatch, useSelector } from "react-redux";
 import NoDataImage from "../../assets/2953962.jpg";
@@ -22,30 +19,30 @@ import AntDesign from "react-native-vector-icons/AntDesign";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 import { launchImageLibrary } from "react-native-image-picker";
 import { Image as IMRNC } from "react-native-compressor";
-import ImgToBase64 from "react-native-image-base64";
 import axios from "axios";
 import { Buffer } from "@craftzdog/react-native-buffer";
 
 function Home(props) {
 
   const BASE_URL = "http://192.168.18.17:8082";
+  // const BASE_URL = "http://192.168.18.138:8082";
+  // const BASE_URL = "http://192.168.18.43:8082";
   const [title, setTitle] = useState("Floor Title");
   const [scenes, setScenes] = useState([]);
   const [newProperty, setNewProperty] = useState(null);
   // const properties = useSelector(state => state.property.properties);
   const [properties, setProperties] = useState([]);
-
+  const [compressing, setCompressing] = useState(false);
+  const [compressingNumber, setCompressingNumber] = useState("");
 
   const MAX_IMAGE_SIZE_IN_KBS = 2000;
 
-  const window = useWindowDimensions();
-
-  const [image, setImage] = useState(null);
+  // const window = useWindowDimensions();
+  // const [image, setImage] = useState(null);
 
   const getProperties = async () => {
     const response = await axios
-      // .get("http://192.168.18.138:8082/properties");
-      .get("http://192.168.18.17:8082/properties");
+      .get(`${BASE_URL}/properties`);
     return response;
   };
 
@@ -56,20 +53,26 @@ function Home(props) {
       })
       .then(async response => new Buffer.from(response.data, "binary").toString("base64"));
 
-    return await compressImage(response, false, true);
+    // return await compressImage(response, false, true);
+    return response;
   };
 
-  const compressImage = async (image, autoCompression = false, base64output = false) => {
+  const compressImage = async (image, autoCompression = false, base64output = false, compressSize = false) => {
+
     const resultant = await IMRNC.compress(image, {
       compressionMethod: autoCompression ? "auto" : "manual",
       maxWidth: 4096,
-      quality: 1,
+      quality: compressSize ? 0.8 : 1,
       returnableOutputType: base64output ? "base64" : "uri",
       input: "base64",
     })
       .then(res => {
         // console.log("Response of Compression: ", res);
-        console.log("Image Size after Compression: ", getImageSize(res));
+        if (compressSize) {
+          console.log("Image Size after Compression for Size: ", getImageSize(res));
+        } else {
+          console.log("Image Size after Compression for width.");
+        }
         return res;
       })
       .catch(err => {
@@ -83,52 +86,68 @@ function Home(props) {
 
   function updateProperties() {
     getProperties().then(r => {
-      console.log("Response: ", r);
-      // console.log('Scene in response: ', r.data[0].scenes);
-
       let propertiesRcvd = r.data;
 
       // Converting Images fetched from Server to Base64 equivalents
       for (const property of propertiesRcvd) {
         for (const scene of property.scenes) {
           if (scene.scenePanoImg) {
-            getImage(`${BASE_URL}\\${scene.scenePanoImg}`).then(res => {
-              scene.scenePanoImg = res;
-              return res;
-            });
+            getImage(`${BASE_URL}\\${scene.scenePanoImg}`)
+              .then(res => {
+                scene.scenePanoImg = res;
+                return res;
+              });
           }
         }
       }
+
       setProperties(propertiesRcvd);
     });
   }
 
-  useEffect(() => {
 
+  /*Fetching Properties on first load*/
+  useEffect(() => {
     updateProperties();
-    // eslint-disable-next-line
   }, []);
 
+  /*Creating new property*/
   useEffect(() => {
-    setNewProperty({
-      title: title,
-      scenes: [...scenes],
-    });
 
-    if (scenes.length)
-      console.log("New Scenes: ", Object.keys(scenes[0]));
-    // eslint-disable-next-line
+    if (scenes?.length) {
+
+      setNewProperty({
+        title: title,
+        scenes: [...scenes],
+      });
+
+      setCompressing(false);
+    }
+
+
   }, [scenes]);
 
-  const dispatch = useDispatch();
-
-  useFocusEffect(() => {
-    console.log("Properties in Store: ", properties.length);
+  /*After new property is created, move to next screen*/
+  useEffect(() => {
+    if (newProperty?.scenes.length) {
+      console.log("Number of Scenes in New Property: ", newProperty?.scenes.length);
+      props.navigation.navigate("SceneInformation", {
+        item: newProperty,
+      });
+    }
 
     return () => {
       setNewProperty(null);
+      setScenes(null);
     };
-  });
+
+  }, [newProperty]);
+
+  const dispatch = useDispatch();
+
+/*  useFocusEffect(() => {
+    console.log("Properties in Store: ", properties.length);
+  });*/
 
   const getImageSize = (imageBase64) => {
 
@@ -160,49 +179,48 @@ function Home(props) {
       });
 
     if (!result.didCancel) {
+      setCompressing(true);
+
       let newScenes = [];
+      let imgNumber = 1;
+      let sceneIndex = 0;
       for (const item of result.assets) {
+        setCompressingNumber(`[${imgNumber}/${result.assets.length}]`);
+
         let resultant = {};
+        let image = item;
 
-        if (item.width > 4096 || getImageSize(item.base64) > MAX_IMAGE_SIZE_IN_KBS) {
-          resultant.base64 = await compressImage(item.uri, true, true);
-          resultant.uri = await compressImage(item.uri, true, false);
-          while (getImageSize(resultant) > MAX_IMAGE_SIZE_IN_KBS) {
-            resultant = await compressImage(item.uri, true, true);
-            console.log("Compressing because of size");
-          }
 
-          /*resultant = await IMRNC.compress(item.uri, {
-            compressionMethod: "auto",
-            maxWidth: 4096,
-            quality: 0.8,
-            returnableOutputType: "base64",
-            // returnableOutputType: 'uri',
-          })
-            .then(res => {
-              // console.log('Response of Compression: ', res);
-              // setImage(res);
-              // console.log("Image Size: ", getImageSize(resultant));
-              console.log("Image Size: ", getImageSize(res));
-              return res;
-            })
-            .catch(err => {
-              console.log("Error While Compression: ", err);
-              return err;
-            });*/
+        /*No need to loop for image width compression*/
+        if (image.width > 4096) {
+          resultant.uri = await compressImage(image.uri, true, false);
+          resultant.base64 = await compressImage(image.uri, true, true);
+          image.uri = resultant.uri;
+          image.base64 = resultant.base64;
         }
 
-        console.log("resultant.uri: ", resultant.uri);
-        console.log("item.uri: ", item.uri);
+        while (getImageSize(image.base64) > MAX_IMAGE_SIZE_IN_KBS) {
+          console.log("--------Compressing for Size--------- ");
+          resultant.uri = await compressImage(image.uri, true, false, true);
+          resultant.base64 = await compressImage(image.uri, true, true, true);
+          image.uri = resultant.uri;
+          image.base64 = resultant.base64;
+        }
+
+        // console.log("resultant.uri: ", resultant.uri);
+        // console.log("item.uri: ", item.uri);
 
         var newScene = {
+          id: sceneIndex,
           sceneName: "Name of Scene",
+          sceneDetail: "Detail of Scene",
           scenePanoURI: resultant.uri ?? item.uri,
-          // scenePanoImg: item.base64 ?? item.uri,
           scenePanoImg: resultant.base64 ?? item.base64,
           hotSpotsArr: [],
         };
         newScenes.push(newScene);
+        imgNumber++;
+        sceneIndex++;
       }
 
       // setImage(result.assets[0].uri);
@@ -240,7 +258,7 @@ function Home(props) {
         }}
         data={properties}
         renderItem={({ item }) => (
-          <ListItem item={item} navigation={props.navigation} />
+          <ListItem item={item} navigation={props.navigation} setCompressing={setCompressing}/>
         )}
 
         ListEmptyComponent={() => {
@@ -340,40 +358,26 @@ function Home(props) {
         </View>
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={{
-          borderRadius: 30,
-          borderWidth: 1,
-          borderColor: "#c3011f",
-          position: "absolute",
-          bottom: 20,
-          right: 20,
-          padding: 1,
-        }}
-        onPress={() => {
-          dispatch(removeAllProperties());
-        }}>
-        <View
-          style={{
-            borderRadius: 30,
-            borderWidth: 1,
-            borderColor: "#c3011f",
-            backgroundColor: "#c3011f",
-            padding: 5,
-          }}>
-          <MaterialCommunityIcons
-            name="delete-outline"
-            size={40}
-            color="#fff"
-          />
-        </View>
-      </TouchableOpacity>
 
-      {newProperty?.scenes.length > 0 &&
-        props.navigation.navigate("PannellumViewer", {
-          item: newProperty,
-          showOptions: true,
-        })}
+
+      {/*{newProperty?.scenes.length > 0 &&*/}
+      {/*  props.navigation.navigate("PannellumViewer", {*/}
+      {/*    item: newProperty,*/}
+      {/*    showOptions: true,*/}
+      {/*  })*/}
+      {/*}*/}
+
+
+      {/*Spinner*/}
+      {
+        compressing &&
+        <View style={styles.loadingBox}>
+          <ActivityIndicator size="large" color="#71a3f5" />
+          <Text style={{ color: "#000000" }}>Getting things ready {compressingNumber}</Text>
+        </View>
+      }
+
+
     </View>
   );
 }
@@ -388,8 +392,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+
   border: {
     borderColor: "#000000",
     borderWidth: 1,
+  },
+
+  loadingBox: {
+    // borderColor: "#000000",
+    // borderWidth: 1,
+    height: 130,
+    width: 300,
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 30,
+    elevation: 5,
+    backgroundColor: "#ffffff",
+    position: "absolute",
   },
 });

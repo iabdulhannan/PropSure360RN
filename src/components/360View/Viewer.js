@@ -68,10 +68,22 @@ function Viewer() {
         JSON.stringify(property.scenes[sceneIndex.current].hotSpotsArr),
     );
 
+/*
     const updatedScene = {
+      id: property.scenes[sceneIndex.current].id,
       sceneName: property.scenes[sceneIndex.current].sceneName,
       scenePanoURI: property.scenes[sceneIndex.current].scenePanoURI,
       scenePanoImg: property.scenes[sceneIndex.current].scenePanoImg,
+      hotSpotsArr: [
+        ...property.scenes[sceneIndex.current].hotSpotsArr,
+        hotSpot.current,
+      ],
+    };
+*/
+
+
+    const updatedScene = {
+      ...property.scenes[sceneIndex.current],
       hotSpotsArr: [
         ...property.scenes[sceneIndex.current].hotSpotsArr,
         hotSpot.current,
@@ -83,7 +95,7 @@ function Viewer() {
         ...prev,
         scenes: property.scenes.map((item, index) => {
           if (index === sceneIndex.current) {
-            // logData("Updating Scene on index: " + sceneIndex.current)
+            logData("Updating Scene on index: " + sceneIndex.current)
             return updatedScene;
           }
           return item;
@@ -98,11 +110,21 @@ function Viewer() {
     hotSpot.current.text = text;
     logData(hotSpot.current);
     // logData("property.scenes[sceneIndex].hotSpotsArr: " + JSON.stringify(property.scenes[sceneIndex.current].hotSpotsArr))
-
+/*
     const updatedScene = {
+      id: property.scenes[sceneIndex.current].id,
       sceneName: property.scenes[sceneIndex.current].sceneName,
+      sceneDetail: property.scenes[sceneIndex.current].sceneDetail,
       scenePanoURI: property.scenes[sceneIndex.current].scenePanoURI,
       scenePanoImg: property.scenes[sceneIndex.current].scenePanoImg,
+      hotSpotsArr: [
+        ...property.scenes[sceneIndex.current].hotSpotsArr,
+        hotSpot.current,
+      ],
+    };
+    */
+    const updatedScene = {
+      ...property.scenes[sceneIndex.current],
       hotSpotsArr: [
         ...property.scenes[sceneIndex.current].hotSpotsArr,
         hotSpot.current,
@@ -224,6 +246,14 @@ function Viewer() {
                 handleClick={(evt, name) => {
                   sceneIndex.current = hotSpot.transition;
                   setScene(property.scenes[hotSpot.transition]);
+                  // logData(`Next Scene: ${Object.values(property.scenes[hotSpot.transition])[1]}`)
+                  logData(`Next Scene: ${property.scenes[hotSpot.transition].id}`)
+                  // logData(`Next Scene: ${Object.keys(property.scenes[hotSpot.transition])}`)
+                  emit({
+                    type: 'sceneChanged',
+                    data: property.scenes[hotSpot.transition].id,
+                  });
+
                 }}
                 name="image info"
               />

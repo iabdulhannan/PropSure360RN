@@ -18,13 +18,12 @@ import BottomSheet, {
   BottomSheetFlatList,
   BottomSheetScrollView,
 } from "@gorhom/bottom-sheet";
-import { useDispatch } from "react-redux";
 import Feather from "react-native-vector-icons/Feather";
 import MaterialIcons from "react-native-vector-icons/MaterialIcons";
-import { addProperty } from "../../slices/PropertySlice";
 import axios from "axios";
 
 const PannellumViewer = ({ image, navigation, route, showOptions = false }) => {
+
   const [property, setProperty] = useState(null);
   const [inEditor, setInEditor] = useState(showOptions);
   const [selectImage, setSelectImage] = useState(false);
@@ -32,71 +31,76 @@ const PannellumViewer = ({ image, navigation, route, showOptions = false }) => {
   const [scenes, setScenes] = useState([]);
   const [enableSaving, setEnableSaving] = useState(false);
   const [title, setTitle] = useState("");
+  const [currentSceneDetails, setCurrentSceneDetails] = useState({});
+  const [showDetails, setShowDetails] = useState(false);
+
 
   const sheetRef = useRef(null);
   const snapPoints = useMemo(() => ["20%", "5%", "50%", "90%"], []);
-  const dispatch = useDispatch();
 
   useEffect(() => {
-    // ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE_LEFT);
     if (route) {
-      // property = route?.params.item
       setProperty(route?.params.item);
+      //Current scene would always be the first scene
+      setCurrentSceneDetails({
+        sceneName: route?.params.item.scenes[0].sceneName,
+        sceneDetail: route?.params.item.scenes[0].sceneDetail,
+      });
       setInEditor(route?.params.showOptions ?? false);
     } else {
-      // property = image
       setProperty(image);
     }
 
     return () => {
-      // ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT);
       setProperty(null);
-      // property = null
     };
-    // eslint-disable-next-line
+
   }, []);
 
-  const renderItem = useCallback(
-    ({ item }) => (
-      <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={() => {
-          console.log("Index: ", item.index);
-          emit({
-            type: "sceneSelected",
-            data: item.index,
-          });
-          setSelectImage(false);
-        }}
-        style={styles.sceneListItem}>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            // marginVertical: 5
-          }}>
-          <Image
+  const renderItem = useCallback(({ item }) => {
+
+      return (
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => {
+            emit({
+              type: "sceneSelected",
+              data: item.index,
+            });
+            setSelectImage(false);
+          }}
+          style={styles.sceneListItem}>
+          <View
             style={{
-              width: 60,
-              height: 40,
-              borderRadius: 15,
-            }}
-            source={{ uri: `data:image/png;base64,${item.scenePanoImg}` }}
-          />
-          <Text
-            style={{
-              fontSize: 18,
-              marginHorizontal: 10,
-              color: "#000",
+              flexDirection: "row",
+              alignItems: "center",
+              // marginVertical: 5
             }}>
-            {item.sceneName}
-          </Text>
-        </View>
-      </TouchableOpacity>
-    ),
-    // eslint-disable-next-line
-    [],
-  );
+            <Image
+              style={{
+                width: 60,
+                height: 40,
+                borderRadius: 15,
+              }}
+              source={{ uri: `data:image/png;base64,${item.scenePanoImg}` }}
+            />
+            <Text
+              style={{
+                fontSize: 18,
+                marginHorizontal: 10,
+                color: "#000",
+              }}>
+              {item.sceneName}
+            </Text>
+            {/*<Button title={"Edit Name"} onPress={()=>{*/}
+            {/*  console.log("Item: ", item.sceneName);*/}
+            {/*}}/>*/}
+          </View>
+        </TouchableOpacity>
+      );
+
+    }
+    , []);
 
   useEffect(() => {
     if (property && inEditor) {
@@ -152,6 +156,23 @@ const PannellumViewer = ({ image, navigation, route, showOptions = false }) => {
     if (message.type === "writeTextForInfoHotspot") {
       setWriteInfo(true);
     }
+
+    if (message.type === "sceneChanged") {
+      //Scene is changed, so I need to update details of the current scene
+
+
+      property.scenes.forEach((scene) => {
+        if (scene.id === message.data) {
+          setCurrentSceneDetails({
+            sceneName: scene.sceneName,
+            sceneDetail: scene.sceneDetail,
+          });
+        }
+      });
+
+    }
+
+
   });
 
   function placeHotSpots(type) {
@@ -174,7 +195,6 @@ const PannellumViewer = ({ image, navigation, route, showOptions = false }) => {
       const random = Math.floor(Math.random() * 27);
       res += String.fromCharCode(97 + random);
     }
-    ;
     return res;
   };
 
@@ -208,9 +228,10 @@ const PannellumViewer = ({ image, navigation, route, showOptions = false }) => {
         },
       };
       // const result = await axios.post("http://192.168.18.138:8082/addproperty", formData, config);
+      // const result = await axios.post("http://192.168.18.43:8082/addproperty", formData, config);
       const result = await axios.post("http://192.168.18.17:8082/addproperty", formData, config);
       console.log("Result: ", result);
-      return result.status
+      return result.status;
     } catch (error) {
 
       console.error("Error while Uploading Image: ", error);
@@ -233,8 +254,10 @@ const PannellumViewer = ({ image, navigation, route, showOptions = false }) => {
       pictures.push(newImage);
       //Placing index instead of image for matching at serverside
       scene.scenePanoImg = index;
-      // scene.scenePanoImg = scene.scenePanoURI;
       delete scene.scenePanoURI;
+      delete scene.id;
+      if (scene.index)
+        delete scene.index;
     });
 
     const response = await uploadProperty(pictures, property);
@@ -259,82 +282,154 @@ const PannellumViewer = ({ image, navigation, route, showOptions = false }) => {
 
   return (
     <View style={styles.container}>
-      {inEditor && (
-        <>
+
+      <View
+        style={{
+          alignItems: "center",
+          zIndex: 10,
+          position: "absolute",
+          top: 10,
+          width: "100%",
+        }}>
+
+        <TouchableOpacity onPress={() => {
+          navigation.goBack();
+        }} style={styles.backButton}>
+          <Feather name="chevron-left" size={32} color="white" />
+        </TouchableOpacity>
+
+        {/*Scene Details Box*/}
+        <View style={{
+          borderRadius: 10,
+          padding: 1,
+          backgroundColor: "#fff",
+          // borderColor: "#000",
+          // borderWidth: 1,
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexDirection: "column",
+          width: "90%",
+          elevation: 10,
+        }}>
+
+
+          <View style={{
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexDirection: "row",
+          }}>
+
+            {/*Scene Title*/}
+            <View style={{
+              width: "85%",
+              borderRightWidth: 1,
+              borderRightColor: "#000000",
+            }}>
+              <Text style={{ color: "#000000", fontSize: 20, textAlign: "center" }}>
+                {
+                  currentSceneDetails?.sceneName
+                }
+
+              </Text>
+            </View>
+
+            {/*Expand Details Button*/}
+            <View style={{
+              width: "15%",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 5,
+            }}>
+
+              <TouchableOpacity
+                style={{
+                  zIndex: 10,
+                  borderRadius: 50,
+                  padding: 1,
+                  // backgroundColor: "#fff",
+                  // borderColor: "#000",
+                  // borderWidth: 1,
+                  width: 30,
+                  height: 30,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                onPress={() => {
+                  setShowDetails(!showDetails);
+                }}>
+                <Feather name="info" size={20} color="black" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {
+            showDetails &&
+            <View style={styles.detailsBox}>
+              <Text style={{ color: "#000000", fontSize: 14 }}>
+                {
+                  currentSceneDetails?.sceneDetail
+                }
+              </Text>
+            </View>
+          }
+
+        </View>
+
+        {inEditor && (
+          <View style={{
+            flexDirection: "column",
+            justifyContent: "flex-end",
+            alignItems: "flex-end",
+            width: "90%",
+            marginVertical: 10,
+            // borderColor: '#000',
+            // borderWidth: 1
+          }}>
+            <TouchableOpacity
+              style={styles.editingButton}
+              onPress={() => {
+                placeHotSpots("custom");
+              }}>
+              <Feather name="crosshair" size={40} color="black" />
+            </TouchableOpacity>
+
+            {/*
           <TouchableOpacity
             style={{
               zIndex: 10,
               borderRadius: 50,
-              position: "absolute",
-              top: 20,
+              position: 'absolute',
+              top: 80,
               right: 10,
-              padding: 1,
-              backgroundColor: "#fff",
-              // borderColor: '#000',
-              // borderWidth: 1,
+              padding: 10,
+              backgroundColor: '#fff',
+              borderColor: '#000',
+              borderWidth: 1,
               width: 50,
               height: 50,
-              alignItems: "center",
-              justifyContent: "center",
+              alignItems: 'center'
             }}
             onPress={() => {
-              placeHotSpots("custom");
-            }}>
-            {/*<Text style={{fontSize: 20}}>PH</Text>*/}
-            <Feather name="crosshair" size={40} color="black" />
+              console.log("Placing text")
+              placeHotSpots('text')
+            }}
+          >
+            <Text style={{fontSize: 20}}>TX</Text>
           </TouchableOpacity>
+*/}
 
-          {/*<TouchableOpacity*/}
-          {/*  style={{*/}
-          {/*    zIndex: 10,*/}
-          {/*    borderRadius: 50,*/}
-          {/*    position: 'absolute',*/}
-          {/*    top: 80,*/}
-          {/*    right: 10,*/}
-          {/*    padding: 10,*/}
-          {/*    backgroundColor: '#fff',*/}
-          {/*    borderColor: '#000',*/}
-          {/*    borderWidth: 1,*/}
-          {/*    width: 50,*/}
-          {/*    height: 50,*/}
-          {/*    alignItems: 'center'*/}
-          {/*  }}*/}
-          {/*  onPress={() => {*/}
-          {/*    console.log("Placing text")*/}
-          {/*    placeHotSpots('text')*/}
-          {/*  }}*/}
-          {/*>*/}
-          {/*  <Text style={{fontSize: 20}}>TX</Text>*/}
-          {/*</TouchableOpacity>*/}
-
-          {enableSaving && (
-            <TouchableOpacity
-              style={{
-                zIndex: 10,
-                borderRadius: 50,
-                position: "absolute",
-                // top: 140,
-                top: 80,
-                right: 10,
-                padding: 1,
-                backgroundColor: "#fff",
-                // borderColor: '#000',
-                // borderWidth: 1,
-                width: 50,
-                height: 50,
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-              onPress={() => {
-                getLatestProperty();
-              }}>
-              {/*<Text style={{fontSize: 20}}>Save</Text>*/}
-              <MaterialIcons name="save-alt" size={35} color="black" />
-            </TouchableOpacity>
-          )}
-        </>
-      )}
-
+            {enableSaving && (
+              <TouchableOpacity
+                style={styles.editingButton}
+                onPress={() => {
+                  getLatestProperty();
+                }}>
+                <MaterialIcons name="save-alt" size={35} color="black" />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+      </View>
       <View
         style={{
           // borderWidth: 2,
@@ -376,7 +471,6 @@ const PannellumViewer = ({ image, navigation, route, showOptions = false }) => {
                 </View>
               );
             }}
-            // data={property.scenes}
             data={scenes}
             keyExtractor={item => {
               // return index.current++
@@ -465,5 +559,29 @@ const styles = StyleSheet.create({
     marginVertical: 5,
     marginHorizontal: 10,
     padding: 5,
+  },
+  editingButton: {
+    borderRadius: 50,
+    padding: 1,
+    backgroundColor: "#fff",
+    width: 50,
+    height: 50,
+    alignItems: "center",
+    justifyContent: "center",
+    marginVertical: 2,
+  },
+  detailsBox: {
+    padding: 10,
+    // borderColor: "#000000",
+    // borderWidth: 1,
+    width: "100%",
+  },
+  backButton: {
+    // borderRadius: 50,
+    // borderColor: '#ffffff',
+    // borderWidth: 1,
+    alignSelf: "flex-start",
+    marginHorizontal: 10,
+    marginBottom: 10,
   },
 });
